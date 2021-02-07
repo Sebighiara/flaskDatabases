@@ -1,4 +1,7 @@
-from flask import Blueprint, render_template, request, flash
+from flask import Blueprint, render_template, request, flash, redirect, url_for
+from .models import User
+from werkzeug.security import generate_password_hash, check_password_hash
+from . import db
 
 
 auth = Blueprint('auth', __name__)
@@ -6,6 +9,20 @@ auth = Blueprint('auth', __name__)
 
 @auth.route('/login', methods = ['GET', 'POST'])
 def login():
+	if request.method == 'POST':
+		email = request.form.get('email')
+		password = request.form.get('password')
+
+		user = User.query.filter_by(email = email).first()
+
+		if user:
+			if check_password_hash(user.password, password):
+				flash('Logged In successfully', category = 'success')
+				return redirect(url_for('views.home'))
+			else:
+				flash('Incorrect password, try again', category = 'error')
+		else:
+			flash('Email doesn\'t exist.', category = 'error')
 	return render_template("login.html", text = "testing")
 
 
@@ -23,8 +40,13 @@ def signUp():
 		password = request.form.get('password')
 		confirmPassword = request.form.get('confirmPassword')
 		
+
 		#user validation
-		if len(firstName) == 0 and len(lastName) == 0 and len(email) == 0 and len(password) == 0:
+		user = User.query.filter_by(email = email).first()
+
+		if user:
+			flash('this email already exists', category = 'error') 
+		elif len(firstName) == 0 and len(lastName) == 0 and len(email) == 0 and len(password) == 0:
 			flash('fill the form', category = 'error')
 		elif len(firstName) < 2 and len(lastName) < 2:
 			flash('Your first or last name is too short', category = 'error')
@@ -35,6 +57,11 @@ def signUp():
 		elif password != confirmPassword:
 			flash('Passwords don\'t match.', category = 'error')
 		else:
-			flash('Account created!', category = 'succes')
 			#add user to database
+			newUser = User(email = email, firstName = firstName, password = generate_password_hash(password, method = 'sha256'))
+			db.session.add(newUser)
+			db.session.commit()
+			flash('Account created!', category = 'succes')
+			return redirect(url_for('views.home'))
+
 	return render_template("signUp.html")
